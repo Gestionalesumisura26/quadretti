@@ -590,3 +590,39 @@ button { font: inherit; color: inherit; }
 }
 .rows dt { color: var(--text-dim); }
 .rows dd { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- vita della griglia ---------- */
+
+.sq {
+  transition: background-color .14s ease;
+}
+
+/* riga e colonna sotto il dito */
+.sq.in-line { background: #EDF0EC; }
+.sq.in-line[data-state="1"] { background: #1E4551; }
+
+/* lampo quando una riga torna, e rivelazione finale in diagonale */
+.sq.lit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--brass);
+  opacity: 0;
+  animation: blink .5s ease-out;
+  animation-delay: calc(var(--step, 0) * 26ms);
+  pointer-events: none;
+}
+.sq[data-state="2"].lit::after { display: none; }
+
+@keyframes blink {
+  0%   { opacity: 0; }
+  30%  { opacity: .55; }
+  100% { opacity: 0; }
+}
+
+.btn-quiet.is-off, .link-btn.is-off { opacity: .55; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sq { transition: none; }
+  .sq.lit::after { animation: none; }
+}
