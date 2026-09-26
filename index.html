@@ -50,6 +50,19 @@
     <div class="tiles" id="tiles-5"></div>
     <h2 class="band">Grandi <span>10 × 10</span></h2>
     <div class="tiles" id="tiles-10"></div>
+
+    <h2 class="band">Allenamento <span>quadri sempre nuovi</span></h2>
+    <div class="train">
+      <div class="train-top">
+        <strong id="train-grade">Grado 1</strong>
+        <span class="badge" id="train-label">Facile</span>
+      </div>
+      <p id="train-done"></p>
+      <div class="train-actions">
+        <button type="button" class="btn btn-quiet" id="btn-train">Nuovo quadro</button>
+        <button type="button" class="link-btn" id="btn-train-resume" hidden>Riprendi quello a metà</button>
+      </div>
+    </div>
   </div>
 
   <footer class="colophon">
@@ -131,6 +144,7 @@
   </div>
 </div>
 
+<script src="generator.js"></script>
 <script src="levels.js"></script>
 <script src="app.js"></script>
 </body>
