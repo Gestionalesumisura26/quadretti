@@ -45,7 +45,10 @@ body {
 
 button { font: inherit; color: inherit; }
 
-.screen[hidden], .curtain[hidden] { display: none; }
+/* Un elemento con l'attributo `hidden` deve sparire, punto: senza
+   !important qualunque regola con un id (come #game, che vale piu' di
+   .screen[hidden]) la scavalcherebbe e l'elemento resterebbe a schermo. */
+[hidden] { display: none !important; }
 
 /* ---------- elenco livelli ---------- */
 
@@ -468,7 +471,6 @@ button { font: inherit; color: inherit; }
   border-radius: 20px;
   padding: 0 7px;
 }
-.badge[hidden] { display: none; }
 
 /* ---------- barra del suggerimento ---------- */
 
