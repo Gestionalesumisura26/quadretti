@@ -152,6 +152,14 @@
     </dl>
 
     <p class="figures-note">Questi numeri stanno solo dentro il tuo telefono.</p>
+
+    <h3>Dati e privacy</h3>
+    <p class="figures-note">In classifica finiscono solo il nome che hai scelto e il tempo. Tutto il resto — partite, statistiche, impostazioni — non esce da qui.</p>
+    <div class="privacy-actions">
+      <button type="button" class="link-btn" id="btn-forget">Esci dalla classifica e cancella i miei tempi</button>
+      <a class="link-btn" href="privacy.html">Informativa completa</a>
+    </div>
+    <p class="figures-note" id="forget-note" hidden></p>
   </div>
 </section>
 
@@ -164,6 +172,7 @@
     <div class="join" id="win-join" hidden>
       <label for="join-name">Con che nome vuoi comparire in classifica?</label>
       <input id="join-name" type="text" maxlength="20" autocomplete="off" autocapitalize="words" placeholder="un soprannome">
+      <p class="join-why" id="join-why" hidden></p>
       <div class="join-actions">
         <button type="button" class="btn btn-quiet" id="join-go">Entra in classifica</button>
         <button type="button" class="link-btn" id="join-no">No grazie</button>
