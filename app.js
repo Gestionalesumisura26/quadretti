@@ -355,6 +355,50 @@
     return store.player.id;
   }
 
+  /* Controllo del soprannome.
+     Primo sbarramento, non un muro: chi vuole aggirarlo ci riesce. Serve a
+     fermare la maggior parte delle sciocchezze prima che finiscano sotto
+     gli occhi di tutti. La segnalazione copre il resto. */
+
+  var RUDE = [
+    'cazz', 'merd', 'stronz', 'putta', 'troia', 'vaffa', 'figa', 'culo',
+    'coglion', 'bastard', 'porcodio', 'diocan', 'madonna', 'negr', 'froci',
+    'fuck', 'shit', 'bitch', 'cunt', 'nigg', 'rape', 'nazi', 'hitler'
+  ];
+
+  function plain(text) {
+    // si smontano le scritture furbe: l33t, lettere ripetute, simboli
+    return text.toLowerCase()
+      .replace(/[àáâä]/g, 'a').replace(/[èéêë]/g, 'e').replace(/[ìíîï]/g, 'i')
+      .replace(/[òóôö]/g, 'o').replace(/[ùúûü]/g, 'u')
+      .replace(/[04]/g, 'o').replace(/[13!|]/g, 'i').replace(/[3]/g, 'e')
+      .replace(/[5$]/g, 's').replace(/[7]/g, 't').replace(/[@]/g, 'a')
+      .replace(/[^a-z]/g, '')
+      .replace(/(.)\1{2,}/g, '$1$1');
+  }
+
+  function nameProblem(name) {
+    var trimmed = name.trim();
+    if (trimmed.length < 2) return 'Serve almeno una parola di due lettere.';
+    if (trimmed.length > 20) return 'Massimo venti caratteri.';
+    if (!/[a-zA-Z0-9\u00C0-\u017F]/.test(trimmed)) return 'Ci vuole almeno una lettera o un numero.';
+    if (/(https?:|www\.|@|\.com|\.it)/i.test(trimmed)) return 'Niente indirizzi o contatti nel nome.';
+
+    var flat = plain(trimmed);
+    for (var i = 0; i < RUDE.length; i++) {
+      if (flat.indexOf(RUDE[i]) >= 0) return 'Scegli un nome che vada bene per tutti.';
+    }
+    return null;
+  }
+
+  function reportName(day, name, li) {
+    Cloud.report(day, name, playerId()).then(function (res) {
+      li.classList.add('reported');
+      var b = li.querySelector('.flag');
+      if (b) b.replaceWith(document.createTextNode(res ? 'segnalato' : 'non riuscito'));
+    });
+  }
+
   function paintBoard(box, data, mine) {
     if (!data || !data.rows.length) { box.hidden = true; return; }
 
@@ -366,14 +410,27 @@
 
     var list = document.createElement('ol');
     for (var i = 0; i < data.rows.length; i++) {
-      var li = document.createElement('li');
-      var nm = document.createElement('span');
-      nm.textContent = data.rows[i].name;
-      var tm = document.createElement('b');
-      tm.textContent = mmss(data.rows[i].seconds);
-      li.appendChild(nm);
-      li.appendChild(tm);
-      list.appendChild(li);
+      (function (row) {
+        var li = document.createElement('li');
+
+        var nm = document.createElement('span');
+        nm.textContent = row.name;
+        li.appendChild(nm);
+
+        var flag = document.createElement('button');
+        flag.type = 'button';
+        flag.className = 'flag';
+        flag.textContent = 'segnala';
+        flag.title = 'Segnala un nome offensivo';
+        flag.addEventListener('click', function () { reportName(todayKey(), row.name, li); });
+        li.appendChild(flag);
+
+        var tm = document.createElement('b');
+        tm.textContent = mmss(row.seconds);
+        li.appendChild(tm);
+
+        list.appendChild(li);
+      })(data.rows[i]);
     }
     box.appendChild(list);
 
@@ -1291,6 +1348,28 @@
     b.classList.toggle('is-off', !store.sound);
   }
 
+  el('btn-forget').addEventListener('click', function () {
+    if (!confirm('Cancelli i tuoi tempi dalla classifica e esci? I progressi sul telefono restano.')) return;
+
+    var note = el('forget-note');
+    note.textContent = 'Sto cancellando...';
+    note.hidden = false;
+
+    var id = store.player.id;
+    store.player.name = '';
+    store.player.out = true;
+    store.sent = {};
+    save();
+
+    if (!id || !Cloud.configured()) { note.textContent = 'Fatto: non sei piu\u0027 in classifica.'; return; }
+
+    Cloud.forget(id).then(function (res) {
+      note.textContent = res
+        ? 'Fatto: i tuoi tempi sono spariti dalla classifica.'
+        : 'Non sono riuscito a contattare il server. Sei comunque uscito dalla classifica: riprova piu\u0027 tardi per cancellare anche i tempi gia\u0027 mandati.';
+    });
+  });
+
   el('btn-sound').addEventListener('click', function () {
     store.sound = !store.sound;
     save();
@@ -1309,7 +1388,14 @@
 
   el('join-go').addEventListener('click', function () {
     var name = el('join-name').value.trim();
-    if (name.length < 1) { el('join-name').focus(); return; }
+    var bad = nameProblem(name);
+    if (bad) {
+      el('join-why').textContent = bad;
+      el('join-why').hidden = false;
+      el('join-name').focus();
+      return;
+    }
+    el('join-why').hidden = true;
 
     store.player.name = name.slice(0, 20);
     store.player.out = false;
