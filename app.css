@@ -628,3 +628,36 @@ button { font: inherit; color: inherit; }
   .sq { transition: none; }
   .sq.lit::after { animation: none; }
 }
+
+/* ---------- quadro del giorno ---------- */
+
+.daily {
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px solid rgba(223, 162, 50, .38);
+  border-radius: var(--radius);
+  background: rgba(223, 162, 50, .07);
+}
+
+.daily-top { display: flex; align-items: center; gap: 10px; }
+
+.daily h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.daily h2 span { color: var(--brass); font-weight: 600; }
+
+.daily-when { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
+
+.daily p:not(.daily-when) {
+  margin: 12px 0 16px;
+  max-width: 44ch;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.daily-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.daily-actions .btn { padding: 12px 24px; }
+.daily-actions .link-btn { padding: 8px 0; }
