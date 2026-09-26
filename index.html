@@ -45,6 +45,19 @@
     <button class="btn btn-quiet" id="btn-install" type="button">Aggiungi alla Home</button>
   </div>
 
+  <section class="daily">
+    <div class="daily-top">
+      <h2>Quadro del giorno <span id="daily-num">n. 1</span></h2>
+      <span class="badge" id="daily-streak" hidden></span>
+    </div>
+    <p class="daily-when" id="daily-when">lunedì</p>
+    <p id="daily-note">Lo stesso per tutti, uno solo al giorno.</p>
+    <div class="daily-actions">
+      <button type="button" class="btn btn-primary" id="daily-btn">Gioca</button>
+      <button type="button" class="link-btn" id="daily-share" hidden>Condividi il risultato</button>
+    </div>
+  </section>
+
   <div class="gallery">
     <h2 class="band">Piccoli <span>5 × 5</span></h2>
     <div class="tiles" id="tiles-5"></div>
@@ -130,6 +143,7 @@
 
     <h3>Dove sei arrivato</h3>
     <dl class="rows">
+      <dt>Quadri del giorno</dt><dd id="st-daily">—</dd>
       <dt>Galleria</dt><dd id="st-gallery">—</dd>
       <dt>Allenamento</dt><dd id="st-train">—</dd>
       <dt>Miglior tempo 5 × 5</dt><dd id="st-best5">—</dd>
