@@ -4,7 +4,7 @@
    (v1 -> v2 e cosi' via), altrimenti i telefoni continuano a usare
    la versione vecchia salvata in cache. */
 
-var CACHE = 'quadretti-v5';
+var CACHE = 'quadretti-v6';
 
 var FILES = [
   './',
@@ -13,6 +13,7 @@ var FILES = [
   './app.js',
   './levels.js',
   './generator.js',
+  './sound.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
