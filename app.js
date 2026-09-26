@@ -26,9 +26,10 @@
       s.log = s.log || [];
       s.stats = s.stats || { solved: 0, seconds: 0 };
       if (typeof s.sound !== 'boolean') s.sound = true;
+      s.dailyDone = s.dailyDone || {};
       return s;
     } catch (e) {
-      return { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true };
+      return { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true, dailyDone: {} };
     }
   }
 
@@ -38,7 +39,12 @@
 
   function saveRun() {
     if (!game || game.won) return;
-    if (game.level.generated) {
+    if (game.level.daily) {
+      if (store.daily && store.daily.key === game.level.dayKey) {
+        store.daily.g = game.grid.join('');
+        store.daily.t = game.elapsed;
+      }
+    } else if (game.level.generated) {
       if (store.train.current) {
         store.train.current.g = game.grid.join('');
         store.train.current.t = game.elapsed;
@@ -173,7 +179,175 @@
     el('tally-streak').textContent = sk.now > 1 ? spell(sk.now, 'giorno', 'giorni') + ' di fila' : '';
     el('tally-streak').hidden = sk.now < 2;
 
+    renderDaily();
     renderTrain();
+  }
+
+  /* ---------------- quadro del giorno ----------------
+     Nasce dalla data, non da un server: stesso giorno, stesso seme, stessa
+     griglia su qualunque telefono. Nessuno scambia niente con nessuno.
+     La difficolta' cresce lungo la settimana, come nei cruciverba dei
+     giornali: lunedi' leggero, sabato cattivo. */
+
+  var EPOCH = '2026-09-26';
+
+  var WEEK = [
+    { n: 'domenica', t: 135 },
+    { n: 'lunedi', t: 58 },
+    { n: 'martedi', t: 72 },
+    { n: 'mercoledi', t: 86 },
+    { n: 'giovedi', t: 100 },
+    { n: 'venerdi', t: 115 },
+    { n: 'sabato', t: 150 }
+  ];
+
+  function todayKey() { return dayKey(new Date()); }
+
+  function dailyNumber(key) {
+    return dayNumber(key) - dayNumber(EPOCH) + 1;
+  }
+
+  function buildDaily(key) {
+    var parts = key.split('-');
+    var weekday = new Date(+parts[0], +parts[1] - 1, +parts[2]).getDay();
+    var target = WEEK[weekday].t;
+
+    // il seme dipende solo dalla data: nessuna traccia di Date.now()
+    var rng = Nono.rngFrom(Nono.seedFrom('quadretti/' + key));
+    var best = null;
+    for (var i = 0; i < 90; i++) {
+      var p = Nono.attempt(10, rng);
+      if (!p) continue;
+      var d = Math.abs(p.grade.value - target);
+      if (!best || d < best.d) best = { d: d, p: p };
+    }
+    return best ? best.p : null;
+  }
+
+  function dailyState() {
+    var key = todayKey();
+    if (!store.daily || store.daily.key !== key) {
+      store.daily = { key: key, g: '', t: 0 };
+    }
+    return store.daily;
+  }
+
+  function openDaily() {
+    var st = dailyState();
+
+    if (!st.rows) {
+      el('daily-btn').textContent = 'Sto preparando il quadro...';
+      el('daily-btn').disabled = true;
+      // si lascia respirare lo schermo prima di mettersi a calcolare
+      setTimeout(function () {
+        var p = buildDaily(st.key);
+        el('daily-btn').disabled = false;
+        if (!p) { renderDaily(); return; }
+        st.rows = p.rows; st.cols = p.cols; st.solution = p.solution; st.value = p.grade.value;
+        save();
+        startDaily();
+      }, 30);
+      return;
+    }
+    startDaily();
+  }
+
+  function startDaily() {
+    var st = store.daily;
+    var level = {
+      id: 'daily', daily: true, dayKey: st.key,
+      name: 'Quadro del giorno', size: 10,
+      rows: st.rows, cols: st.cols, solution: st.solution
+    };
+
+    var grid = new Array(100).fill(EMPTY);
+    if (st.g && st.g.length === 100) {
+      for (var i = 0; i < st.g.length; i++) grid[i] = +st.g.charAt(i) || 0;
+    }
+
+    game = { level: level, grid: grid, elapsed: st.t || 0, mode: 'fill', won: false };
+
+    var parts = st.key.split('-');
+    var wd = WEEK[new Date(+parts[0], +parts[1] - 1, +parts[2]).getDay()].n;
+    el('game-title').textContent = 'Quadro del giorno n. ' + dailyNumber(st.key);
+    el('game-sub').textContent = '10 \u00d7 10 \u00b7 ' + wd;
+    el('clock').textContent = mmss(game.elapsed);
+    el('board').classList.remove('is-locked');
+    el('hint-badge').hidden = true;
+    el('hint').hidden = true;
+    setMode('fill');
+
+    buildBoard();
+    show('game');
+    startClock();
+  }
+
+  function dailyStreak() {
+    var done = store.dailyDone || {};
+    var list = Object.keys(done).map(dayNumber).sort(function (a, b) { return a - b; });
+    if (!list.length) return { now: 0, best: 0, total: 0 };
+
+    var best = 1, run = 1;
+    for (var i = 1; i < list.length; i++) {
+      run = (list[i] === list[i - 1] + 1) ? run + 1 : 1;
+      if (run > best) best = run;
+    }
+
+    var today = dayNumber(todayKey());
+    var last = list[list.length - 1], now = 0;
+    if (last === today || last === today - 1) {
+      now = 1;
+      for (var k = list.length - 1; k > 0; k--) {
+        if (list[k] === list[k - 1] + 1) now++; else break;
+      }
+    }
+    return { now: now, best: best, total: list.length };
+  }
+
+  function renderDaily() {
+    var key = todayKey();
+    var done = (store.dailyDone || {})[key];
+    var st = store.daily;
+
+    el('daily-num').textContent = 'n. ' + dailyNumber(key);
+    var parts = key.split('-');
+    el('daily-when').textContent = WEEK[new Date(+parts[0], +parts[1] - 1, +parts[2]).getDay()].n;
+
+    var streak = dailyStreak();
+    el('daily-streak').textContent = streak.now > 1 ? streak.now + ' giorni di fila' : '';
+    el('daily-streak').hidden = streak.now < 2;
+
+    if (typeof done === 'number') {
+      el('daily-note').textContent = 'Fatto in ' + mmss(done) + '. Il prossimo arriva domani.';
+      el('daily-btn').hidden = true;
+      el('daily-share').hidden = false;
+    } else {
+      el('daily-note').textContent = (st && st.g && st.g.indexOf('1') >= 0)
+        ? 'Lo hai lasciato a meta\u0027.'
+        : 'Lo stesso per tutti, uno solo al giorno.';
+      el('daily-btn').hidden = false;
+      el('daily-btn').textContent = (st && st.g && st.g.indexOf('1') >= 0) ? 'Riprendi' : 'Gioca';
+      el('daily-share').hidden = true;
+    }
+  }
+
+  function shareDaily() {
+    var key = todayKey();
+    var t = (store.dailyDone || {})[key];
+    if (typeof t !== 'number') return;
+
+    var streak = dailyStreak();
+    // niente disegno nel testo: rovinerebbe il quadro a chi non l'ha fatto
+    var text = 'Quadretti n. ' + dailyNumber(key) + ' \u2014 ' + mmss(t) +
+               (streak.now > 1 ? ' \u00b7 ' + streak.now + ' giorni di fila' : '');
+
+    if (navigator.share) {
+      navigator.share({ text: text }).catch(function () {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(function () {
+        el('daily-note').textContent = 'Copiato negli appunti.';
+      }).catch(function () {});
+    }
   }
 
   /* ---------------- statistiche ----------------
@@ -242,6 +416,11 @@
     for (var i = 0; i < LEVELS.length; i++) {
       if (typeof store.done[LEVELS[i].id] === 'number') owned++;
     }
+    var ds = dailyStreak();
+    el('st-daily').textContent = ds.total === 0
+      ? 'nessuno'
+      : spell(ds.total, 'quadro', 'quadri') + (ds.best > 1 ? ', al massimo ' + ds.best + ' di fila' : '');
+
     el('st-gallery').textContent = owned + ' di ' + LEVELS.length;
     el('st-train').textContent = store.train.solved === 0
       ? 'nessuno'
@@ -808,7 +987,7 @@
     store.log.push({
       d: dayKey(new Date()),
       t: game.elapsed,
-      k: game.level.generated ? 't' : 'g',
+      k: game.level.daily ? 'd' : (game.level.generated ? 't' : 'g'),
       s: game.level.size
     });
     // il registro non deve crescere all'infinito dentro il telefono
@@ -838,7 +1017,11 @@
 
     record();
 
-    if (game.level.generated) {
+    if (game.level.daily) {
+      store.dailyDone[game.level.dayKey] = game.elapsed;
+      if (store.daily) { store.daily.g = ''; store.daily.t = game.elapsed; }
+      save();
+    } else if (game.level.generated) {
       store.train.solved++;
       store.train.grade++;
       if (!store.stats.topGrade || game.level.grade > store.stats.topGrade) {
@@ -862,7 +1045,10 @@
     el('win-time').textContent = 'Risolto in ' + mmss(game.elapsed);
     drawWinArt(game.level);
 
-    if (game.level.generated) {
+    if (game.level.daily) {
+      el('btn-next').hidden = true;
+      el('btn-next').dataset.next = '';
+    } else if (game.level.generated) {
       el('btn-next').hidden = false;
       el('btn-next').dataset.next = 'train';
       el('btn-next').textContent = 'Un altro, piu\u0027 tosto';
@@ -966,6 +1152,13 @@
 
   el('btn-restart').addEventListener('click', function () {
     if (!game || !confirm('Svuoti il quadro e riparti da zero?')) return;
+    if (game.level.daily) {
+      store.daily.g = '';
+      store.daily.t = 0;
+      save();
+      startDaily();
+      return;
+    }
     if (game.level.generated) {
       store.train.current.g = '';
       store.train.current.t = 0;
@@ -1011,12 +1204,15 @@
     show('home');
   });
 
+  el('daily-btn').addEventListener('click', openDaily);
+  el('daily-share').addEventListener('click', shareDaily);
+
   el('btn-train').addEventListener('click', newTraining);
   el('btn-train-resume').addEventListener('click', openTraining);
 
   el('btn-wipe').addEventListener('click', function () {
     if (!confirm('Cancelli tutti i progressi? Non si torna indietro.')) return;
-    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true };
+    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true, dailyDone: {} };
     save();
     applySound();
     renderHome();
