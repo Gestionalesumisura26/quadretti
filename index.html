@@ -40,6 +40,11 @@
     <p>Non si tira mai a indovinare. Ogni quadro ha una sola soluzione e ci si arriva incrociando le righe con le colonne. Quando tutti i numeri tornano, viene fuori un disegno: quello è il premio.</p>
   </section>
 
+  <div class="install" id="install" hidden>
+    <p id="install-msg">Mettilo nella schermata Home: parte a schermo intero e funziona anche senza rete.</p>
+    <button class="btn btn-quiet" id="btn-install" type="button">Aggiungi alla Home</button>
+  </div>
+
   <div class="gallery">
     <h2 class="band">Piccoli <span>5 × 5</span></h2>
     <div class="tiles" id="tiles-5"></div>
@@ -61,12 +66,17 @@
     <div class="topbar-title">
       <strong id="game-title">—</strong>
       <span id="game-sub"></span>
+      <span class="badge" id="hint-badge" hidden>con aiuti</span>
     </div>
     <time id="clock" aria-label="Tempo trascorso">0:00</time>
   </header>
 
   <div class="board-wrap">
     <div id="board" class="board"></div>
+  </div>
+
+  <div class="hint" id="hint" hidden>
+    <p id="hint-text"></p>
   </div>
 
   <div class="controls">
@@ -92,6 +102,32 @@
       <button type="button" class="btn btn-primary" id="btn-next">Quadro successivo</button>
       <button type="button" class="link-btn" id="btn-gallery">Torna all'elenco</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ COME AGGIUNGERLO ALLA HOME (iPhone) ============ -->
+<div id="sheet" class="curtain" hidden>
+  <div class="win-card sheet-card">
+    <h2>Aggiungerlo alla Home</h2>
+
+    <div id="ios-safari" hidden>
+      <p class="sheet-lead">Su iPhone questo passaggio lo fa Safari, non il gioco: Apple non permette alle pagine web di creare scorciatoie da sole.</p>
+      <ol class="steps">
+        <li>Tocca il pulsante <strong>Condividi</strong> in basso, il quadrato con la freccia che esce.</li>
+        <li>Scorri l'elenco verso il basso.</li>
+        <li>Tocca <strong>Aggiungi a Home</strong>, poi <strong>Aggiungi</strong> in alto a destra.</li>
+      </ol>
+    </div>
+
+    <div id="ios-other" hidden>
+      <p class="sheet-lead">Questa pagina è aperta dentro un'altra app, e da qui la voce per aggiungere alla Home non c'è.</p>
+      <ol class="steps">
+        <li>Tocca i tre puntini in alto e scegli <strong>Apri in Safari</strong>.</li>
+        <li>Da Safari, tocca <strong>Condividi</strong> e poi <strong>Aggiungi a Home</strong>.</li>
+      </ol>
+    </div>
+
+    <button type="button" class="btn btn-primary" id="btn-sheet-close">Ho capito</button>
   </div>
 </div>
 
