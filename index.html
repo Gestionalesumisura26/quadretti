@@ -52,6 +52,7 @@
     </div>
     <p class="daily-when" id="daily-when">lunedì</p>
     <p id="daily-note">Lo stesso per tutti, uno solo al giorno.</p>
+    <div class="board" id="daily-board" hidden></div>
     <div class="daily-actions">
       <button type="button" class="btn btn-primary" id="daily-btn">Gioca</button>
       <button type="button" class="link-btn" id="daily-share" hidden>Condividi il risultato</button>
@@ -160,6 +161,18 @@
     <canvas id="win-art" width="240" height="240" aria-hidden="true"></canvas>
     <h2 id="win-name">—</h2>
     <p id="win-time">—</p>
+    <div class="join" id="win-join" hidden>
+      <label for="join-name">Con che nome vuoi comparire in classifica?</label>
+      <input id="join-name" type="text" maxlength="20" autocomplete="off" autocapitalize="words" placeholder="un soprannome">
+      <div class="join-actions">
+        <button type="button" class="btn btn-quiet" id="join-go">Entra in classifica</button>
+        <button type="button" class="link-btn" id="join-no">No grazie</button>
+      </div>
+      <p class="join-note">Il nome sarà visibile a chiunque apra il gioco. Meglio un soprannome che nome e cognome.</p>
+    </div>
+
+    <div class="board" id="win-board" hidden></div>
+
     <div class="win-actions">
       <button type="button" class="btn btn-primary" id="btn-next">Quadro successivo</button>
       <button type="button" class="link-btn" id="btn-gallery">Torna all'elenco</button>
@@ -193,6 +206,7 @@
   </div>
 </div>
 
+<script src="cloud.js"></script>
 <script src="sound.js"></script>
 <script src="generator.js"></script>
 <script src="levels.js"></script>
