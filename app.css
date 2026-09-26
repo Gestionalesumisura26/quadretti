@@ -76,6 +76,74 @@ button { font: inherit; color: inherit; }
   font-variant-numeric: tabular-nums;
 }
 
+/* blocco "che cos'e' un crucipixel" */
+
+.primer {
+  margin-top: 26px;
+  padding: 18px 18px 16px;
+  background: var(--ground-soft);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.primer h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.primer p {
+  margin: 0 0 12px;
+  max-width: 46ch;
+  font-size: 14.5px;
+  color: var(--text-dim);
+}
+.primer p:last-child { margin-bottom: 0; }
+
+.demo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 12px;
+}
+
+.demo-clue {
+  font-size: 15px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.14em;
+}
+
+.demo-row { display: flex; }
+
+.demo-row i {
+  display: block;
+  width: 26px;
+  height: 26px;
+  position: relative;
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-top-color: var(--line-strong);
+  border-bottom-color: var(--line-strong);
+}
+.demo-row i:first-child { border-left-color: var(--line-strong); }
+.demo-row i:last-child { border-right-color: var(--line-strong); }
+.demo-row i.on { background: var(--ink); }
+
+.demo-row i.off::before,
+.demo-row i.off::after {
+  content: "";
+  position: absolute;
+  inset: 32% 50%;
+  left: 50%;
+  width: 1.5px;
+  background: var(--mark);
+}
+.demo-row i.off::before { transform: translateX(-50%) rotate(45deg); }
+.demo-row i.off::after  { transform: translateX(-50%) rotate(-45deg); }
+
 .band {
   display: flex;
   align-items: baseline;
