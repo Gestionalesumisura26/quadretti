@@ -19,7 +19,10 @@ var Cloud = (function () {
   var URL = 'https://qzzgtjpnswnpsbjvlpzr.supabase.co';
   var KEY = 'sb_publishable_sTNlFg45QhjH78kFLxHpTQ_IFhbDILj';
 
-  var TABLE = '/rest/v1/daily_times';
+  var TABLE = '/rest/v1/daily_times';      // ci si scrive soltanto
+  var BOARD = '/rest/v1/daily_board';      // si legge solo da qui: tre colonne, niente identificativi
+  var FLAGS = '/rest/v1/name_reports';
+  var FORGET = '/rest/v1/rpc/forget_me';
   var TIMEOUT = 6000;      // un server addormentato non deve piantare lo schermo
 
   function headers(extra) {
@@ -99,7 +102,7 @@ var Cloud = (function () {
     board: function (day, seconds) {
       var q = '?day=eq.' + encodeURIComponent(day);
 
-      var top = ask(TABLE + q + '&select=name,seconds&order=seconds.asc&limit=5', {
+      var top = ask(BOARD + q + '&select=name,seconds&order=seconds.asc&limit=5', {
         headers: headers({ 'Prefer': 'count=exact', 'Range': '0-4' })
       }).then(function (res) {
         if (!res || !res.ok) return null;
@@ -109,7 +112,7 @@ var Cloud = (function () {
       });
 
       var faster = (typeof seconds === 'number')
-        ? ask(TABLE + q + '&seconds=lt.' + seconds + '&select=id', {
+        ? ask(BOARD + q + '&seconds=lt.' + seconds + '&select=seconds', {
             headers: headers({ 'Prefer': 'count=exact', 'Range': '0-0' })
           }).then(function (res) {
             return (res && res.ok) ? totalFrom(res) : null;
@@ -124,6 +127,32 @@ var Cloud = (function () {
           faster: out[1]
         };
       }).catch(function () { return null; });
+    },
+
+    /* Segnala un soprannome. Tre segnalazioni da persone diverse e il nome
+       sparisce dalla classifica da solo, senza aspettare che qualcuno
+       guardi la dashboard. */
+    report: function (day, name, reporter) {
+      return ask(FLAGS, {
+        method: 'POST',
+        headers: headers({ 'Prefer': 'return=minimal' }),
+        body: JSON.stringify([{ day: day, name: String(name).trim().slice(0, 20), reporter: reporter }])
+      }).then(function (res) {
+        if (!res) return null;
+        if (res.status === 409) return 'gia';     // gia' segnalato da questa persona
+        return res.ok ? 'ok' : null;
+      });
+    },
+
+    /* Cancella dal server tutti i tempi di questo telefono. */
+    forget: function (clientId) {
+      return ask(FORGET, {
+        method: 'POST',
+        headers: headers({}),
+        body: JSON.stringify({ p_client: clientId })
+      }).then(function (res) {
+        return (res && res.ok) ? 'ok' : null;
+      });
     }
   };
 })();
