@@ -22,9 +22,10 @@
       if (!s || typeof s !== 'object') throw 0;
       s.runs = s.runs || {};
       s.done = s.done || {};
+      s.train = s.train || { grade: 1, solved: 0 };
       return s;
     } catch (e) {
-      return { runs: {}, done: {} };
+      return { runs: {}, done: {}, train: { grade: 1, solved: 0 } };
     }
   }
 
@@ -34,7 +35,14 @@
 
   function saveRun() {
     if (!game || game.won) return;
-    store.runs[game.level.id] = { g: game.grid.join(''), t: game.elapsed };
+    if (game.level.generated) {
+      if (store.train.current) {
+        store.train.current.g = game.grid.join('');
+        store.train.current.t = game.elapsed;
+      }
+    } else {
+      store.runs[game.level.id] = { g: game.grid.join(''), t: game.elapsed };
+    }
     save();
   }
 
@@ -157,6 +165,107 @@
 
     el('tally-done').textContent = done;
     el('tally-all').textContent = LEVELS.length;
+    renderTrain();
+  }
+
+  /* ---------------- allenamento ----------------
+     Quadri creati sul momento, sempre diversi, che si fanno via via piu'
+     impegnativi. La difficolta' non cresce allargando la griglia: resta
+     10x10 e cresce la profondita' del ragionamento richiesto. */
+
+  function targetFor(grade) {
+    var t = 55 + (grade - 1) * 7;
+    if (grade % 4 === 0) t = Math.round(t * 0.72);   // un respiro ogni quattro
+    return Math.min(t, 210);
+  }
+
+  function gradeLabel(value) {
+    if (value < 65) return 'Facile';
+    if (value < 95) return 'Medio';
+    if (value < 140) return 'Difficile';
+    return 'Tosto';
+  }
+
+  function makePuzzle(grade) {
+    var rng = Nono.rngFrom((Date.now() ^ Math.imul(grade, 2654435761)) >>> 0);
+    var target = targetFor(grade);
+    var best = null;
+
+    // Si generano tanti candidati e si tiene quello piu' vicino al bersaglio:
+    // cosi' non si rischia di cercare all'infinito una difficolta' esatta.
+    for (var i = 0; i < 90; i++) {
+      var p = Nono.attempt(10, rng);
+      if (!p) continue;
+      var d = Math.abs(p.grade.value - target);
+      if (!best || d < best.d) best = { d: d, p: p };
+    }
+    return best ? best.p : null;
+  }
+
+  function asLevel(p, grade) {
+    return {
+      id: 'train',
+      generated: true,
+      grade: grade,
+      value: p.grade.value,
+      name: gradeLabel(p.grade.value),
+      size: p.size,
+      rows: p.rows,
+      cols: p.cols,
+      solution: p.solution
+    };
+  }
+
+  function newTraining() {
+    var grade = store.train.grade;
+    var p = makePuzzle(grade);
+    if (!p) {
+      el('train-done').textContent = 'Non sono riuscito a creare un quadro. Riprova.';
+      return;
+    }
+    store.train.current = {
+      grade: grade, value: p.grade.value, size: p.size,
+      rows: p.rows, cols: p.cols, solution: p.solution,
+      g: '', t: 0
+    };
+    save();
+    openTraining();
+  }
+
+  function openTraining() {
+    var c = store.train.current;
+    if (!c) return;
+
+    var level = asLevel({ size: c.size, rows: c.rows, cols: c.cols, solution: c.solution,
+                          grade: { value: c.value } }, c.grade);
+    var grid = new Array(c.size * c.size).fill(EMPTY);
+    if (c.g && c.g.length === c.size * c.size) {
+      for (var i = 0; i < c.g.length; i++) grid[i] = +c.g.charAt(i) || 0;
+    }
+
+    game = { level: level, grid: grid, elapsed: c.t || 0, mode: 'fill', won: false };
+
+    el('game-title').textContent = 'Allenamento, grado ' + c.grade;
+    el('game-sub').textContent = c.size + ' \u00d7 ' + c.size + ' \u00b7 ' + gradeLabel(c.value);
+    el('clock').textContent = mmss(game.elapsed);
+    el('board').classList.remove('is-locked');
+    el('hint-badge').hidden = true;
+    el('hint').hidden = true;
+    setMode('fill');
+
+    buildBoard();
+    show('game');
+    startClock();
+  }
+
+  function renderTrain() {
+    var t = store.train;
+    el('train-grade').textContent = 'Grado ' + t.grade;
+    el('train-label').textContent = gradeLabel(targetFor(t.grade));
+    el('train-done').textContent = t.solved === 0
+      ? 'Quadri creati sul momento, sempre diversi. Ogni volta che ne risolvi uno, il prossimo alza l\u0027asticella.'
+      : (t.solved === 1 ? 'Un quadro risolto.' : t.solved + ' quadri risolti.');
+    el('btn-train-resume').hidden = !t.current;
   }
 
   /* ---------------- costruzione del quadro ---------------- */
@@ -361,63 +470,7 @@
      riga c'e' un errore, e lo si segnala. */
 
   var HINT_AFTER = 25000;     // fermo da tanti millisecondi -> arriva l'aiuto
-  var candCache = {};
   var hintTimer = null;
-
-  function lineCandidates(clue, n) {
-    var key = n + '|' + clue.join(',');
-    if (candCache[key]) return candCache[key];
-
-    var blocks = clue.filter(function (c) { return c > 0; });
-    var out = [];
-
-    (function place(i, from, acc) {
-      if (i === blocks.length) {
-        var line = acc.slice();
-        while (line.length < n) line.push(0);
-        out.push(line);
-        return;
-      }
-      var need = 0;
-      for (var k = i; k < blocks.length; k++) need += blocks[k];
-      need += blocks.length - i - 1;
-
-      for (var start = from; start <= n - need; start++) {
-        var next = acc.slice();
-        while (next.length < start) next.push(0);
-        for (var b = 0; b < blocks[i]; b++) next.push(1);
-        if (i < blocks.length - 1) next.push(0);
-        place(i + 1, start + blocks[i] + 1, next);
-      }
-    })(0, 0, []);
-
-    candCache[key] = out;
-    return out;
-  }
-
-  function analyseLine(known, clue) {
-    var all = lineCandidates(clue, known.length);
-    var fit = [];
-    for (var c = 0; c < all.length; c++) {
-      var ok = true;
-      for (var i = 0; i < known.length; i++) {
-        if (known[i] !== -1 && known[i] !== all[c][i]) { ok = false; break; }
-      }
-      if (ok) fit.push(all[c]);
-    }
-    if (!fit.length) return { broken: true };
-
-    var forced = [];
-    for (var j = 0; j < known.length; j++) {
-      if (known[j] !== -1) continue;
-      var v = fit[0][j], same = true;
-      for (var f = 1; f < fit.length; f++) {
-        if (fit[f][j] !== v) { same = false; break; }
-      }
-      if (same) forced.push({ index: j, value: v });
-    }
-    return { forced: forced, options: fit.length };
-  }
 
   function knownAt(x, y) {
     var s = game.grid[y * game.level.size + x];
@@ -442,11 +495,11 @@
     var best = null;
 
     function consider(kind, idx, known, clue) {
-      var res = analyseLine(known, clue);
-      if (res.broken || !res.forced.length) return;
+      var res = Nono.analyseLine(known, clue);
+      if (!res || !res.length) return;
       // si preferisce la riga con meno alternative: e' la piu' facile da vedere
       if (!best || res.options < best.options) {
-        var f = res.forced[0];
+        var f = res[0];
         best = {
           kind: kind,
           idx: idx,
@@ -586,11 +639,18 @@
       }
     }
 
-    var id = game.level.id;
-    var best = store.done[id];
-    if (typeof best !== 'number' || game.elapsed < best) store.done[id] = game.elapsed;
-    delete store.runs[id];
-    save();
+    if (game.level.generated) {
+      store.train.solved++;
+      store.train.grade++;
+      delete store.train.current;
+      save();
+    } else {
+      var id = game.level.id;
+      var best = store.done[id];
+      if (typeof best !== 'number' || game.elapsed < best) store.done[id] = game.elapsed;
+      delete store.runs[id];
+      save();
+    }
 
     if (navigator.vibrate) navigator.vibrate([18, 60, 18]);
 
@@ -598,9 +658,16 @@
     el('win-time').textContent = 'Risolto in ' + mmss(game.elapsed);
     drawWinArt(game.level);
 
-    var next = nextUnsolved(id);
-    el('btn-next').hidden = !next;
-    el('btn-next').dataset.next = next || '';
+    if (game.level.generated) {
+      el('btn-next').hidden = false;
+      el('btn-next').dataset.next = 'train';
+      el('btn-next').textContent = 'Un altro, piu\u0027 tosto';
+    } else {
+      var next = nextUnsolved(game.level.id);
+      el('btn-next').hidden = !next;
+      el('btn-next').dataset.next = next || '';
+      el('btn-next').textContent = 'Quadro successivo';
+    }
 
     setTimeout(function () { el('win').hidden = false; }, 520);
   }
@@ -678,6 +745,13 @@
 
   el('btn-restart').addEventListener('click', function () {
     if (!game || !confirm('Svuoti il quadro e riparti da zero?')) return;
+    if (game.level.generated) {
+      store.train.current.g = '';
+      store.train.current.t = 0;
+      save();
+      openTraining();
+      return;
+    }
     var id = game.level.id;
     delete store.runs[id];
     save();
@@ -685,14 +759,19 @@
   });
 
   el('btn-next').addEventListener('click', function () {
-    var id = +el('btn-next').dataset.next;
+    var which = el('btn-next').dataset.next;
     el('win').hidden = true;
-    if (id) openLevel(id); else goHome();
+    if (which === 'train') newTraining();
+    else if (+which) openLevel(+which);
+    else goHome();
   });
+
+  el('btn-train').addEventListener('click', newTraining);
+  el('btn-train-resume').addEventListener('click', openTraining);
 
   el('btn-wipe').addEventListener('click', function () {
     if (!confirm('Cancelli tutti i progressi? Non si torna indietro.')) return;
-    store = { runs: {}, done: {} };
+    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 } };
     save();
     renderHome();
   });
