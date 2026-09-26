@@ -27,9 +27,11 @@
       s.stats = s.stats || { solved: 0, seconds: 0 };
       if (typeof s.sound !== 'boolean') s.sound = true;
       s.dailyDone = s.dailyDone || {};
+      s.sent = s.sent || {};
+      s.player = s.player || { id: '', name: '', out: false };
       return s;
     } catch (e) {
-      return { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true, dailyDone: {} };
+      return { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true, dailyDone: {}, sent: {}, player: { id: '', name: '', out: false } };
     }
   }
 
@@ -321,6 +323,7 @@
       el('daily-note').textContent = 'Fatto in ' + mmss(done) + '. Il prossimo arriva domani.';
       el('daily-btn').hidden = true;
       el('daily-share').hidden = false;
+      loadBoard(el('daily-board'), done);
     } else {
       el('daily-note').textContent = (st && st.g && st.g.indexOf('1') >= 0)
         ? 'Lo hai lasciato a meta\u0027.'
@@ -328,7 +331,102 @@
       el('daily-btn').hidden = false;
       el('daily-btn').textContent = (st && st.g && st.g.indexOf('1') >= 0) ? 'Riprendi' : 'Gioca';
       el('daily-share').hidden = true;
+      el('daily-board').hidden = true;
     }
+  }
+
+  /* ---------------- classifica ----------------
+     Tutto quello che segue e' facoltativo: se il server non risponde, la
+     classifica non compare e il gioco prosegue come se non esistesse. */
+
+  function playerId() {
+    if (!store.player.id) {
+      try {
+        store.player.id = crypto.randomUUID();
+      } catch (e) {
+        // browser vecchi: va bene un identificativo casuale qualsiasi
+        store.player.id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          var r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+      }
+      save();
+    }
+    return store.player.id;
+  }
+
+  function paintBoard(box, data, mine) {
+    if (!data || !data.rows.length) { box.hidden = true; return; }
+
+    box.innerHTML = '';
+
+    var title = document.createElement('h4');
+    title.textContent = 'Classifica di oggi';
+    box.appendChild(title);
+
+    var list = document.createElement('ol');
+    for (var i = 0; i < data.rows.length; i++) {
+      var li = document.createElement('li');
+      var nm = document.createElement('span');
+      nm.textContent = data.rows[i].name;
+      var tm = document.createElement('b');
+      tm.textContent = mmss(data.rows[i].seconds);
+      li.appendChild(nm);
+      li.appendChild(tm);
+      list.appendChild(li);
+    }
+    box.appendChild(list);
+
+    if (typeof mine === 'number' && typeof data.faster === 'number' && data.total) {
+      var pos = data.faster + 1;
+      var note = document.createElement('p');
+      if (data.total > 3) {
+        var beaten = Math.round(((data.total - pos) / data.total) * 100);
+        note.textContent = 'Sei ' + pos + " su " + data.total +
+          ', piu\u0027 veloce del ' + beaten + '% di chi ha giocato oggi.';
+      } else {
+        note.textContent = 'Sei ' + pos + ' su ' + data.total + '.';
+      }
+      box.appendChild(note);
+    }
+    box.hidden = false;
+  }
+
+  function loadBoard(box, mine) {
+    if (!Cloud.configured()) { box.hidden = true; return; }
+    Cloud.board(todayKey(), mine).then(function (data) {
+      paintBoard(box, data, mine);
+    });
+  }
+
+  function sendTime(seconds) {
+    var key = todayKey();
+    if (store.sent[key]) { loadBoard(el('win-board'), seconds); return; }
+
+    Cloud.send(key, playerId(), store.player.name, seconds).then(function (res) {
+      if (res) { store.sent[key] = true; save(); }
+      loadBoard(el('win-board'), seconds);
+    });
+  }
+
+  /* Al momento della vittoria: chi non ha ancora un nome se lo sceglie,
+     chi ha detto di no vede solo la classifica, chi e' gia' dentro manda
+     il tempo e basta. */
+  function afterDailyWin(seconds) {
+    el('win-join').hidden = true;
+    el('win-board').hidden = true;
+
+    if (!Cloud.configured()) return;
+
+    if (store.player.out || store.player.name) {
+      if (store.player.name) sendTime(seconds);
+      else loadBoard(el('win-board'), seconds);
+      return;
+    }
+
+    el('win-join').hidden = false;
+    el('join-name').value = '';
+    loadBoard(el('win-board'), seconds);
   }
 
   function shareDaily() {
@@ -1059,7 +1157,12 @@
       el('btn-next').textContent = 'Quadro successivo';
     }
 
-    setTimeout(function () { el('win').hidden = false; }, 520);
+    var wasDaily = game.level.daily, took = game.elapsed;
+    setTimeout(function () {
+      el('win').hidden = false;
+      if (wasDaily) afterDailyWin(took);
+      else { el('win-join').hidden = true; el('win-board').hidden = true; }
+    }, 520);
   }
 
   /* Rivelazione: il disegno finito si accende in diagonale, da un angolo
@@ -1204,6 +1307,25 @@
     show('home');
   });
 
+  el('join-go').addEventListener('click', function () {
+    var name = el('join-name').value.trim();
+    if (name.length < 1) { el('join-name').focus(); return; }
+
+    store.player.name = name.slice(0, 20);
+    store.player.out = false;
+    save();
+
+    el('win-join').hidden = true;
+    var t = (store.dailyDone || {})[todayKey()];
+    if (typeof t === 'number') sendTime(t);
+  });
+
+  el('join-no').addEventListener('click', function () {
+    store.player.out = true;
+    save();
+    el('win-join').hidden = true;
+  });
+
   el('daily-btn').addEventListener('click', openDaily);
   el('daily-share').addEventListener('click', shareDaily);
 
@@ -1212,7 +1334,7 @@
 
   el('btn-wipe').addEventListener('click', function () {
     if (!confirm('Cancelli tutti i progressi? Non si torna indietro.')) return;
-    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true, dailyDone: {} };
+    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true, dailyDone: {}, sent: {}, player: { id: '', name: '', out: false } };
     save();
     applySound();
     renderHome();
