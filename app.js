@@ -131,6 +131,13 @@
       nm.textContent = solved ? level.name : 'n. ' + (idx + 1);
       b.appendChild(nm);
 
+      if (level.hints) {
+        var tg2 = document.createElement('span');
+        tg2.className = 'tile-tag';
+        tg2.textContent = 'con aiuti';
+        b.appendChild(tg2);
+      }
+
       if (solved) {
         var tm = document.createElement('span');
         tm.className = 'tile-time';
@@ -340,8 +347,182 @@
     clearTimeout(paint.longTimer);
     paint = null;
     refreshClues();
+    hideHint();
     if (isSolved()) finish();
-    else saveRun();
+    else { saveRun(); armHint(); }
+  }
+
+  /* ---------------- suggerimenti ----------------
+     Un suggerimento non e' mai inventato: si guarda una riga (o colonna),
+     si elencano tutte le disposizioni compatibili con gli indizi E con
+     quello che il giocatore ha gia' segnato, e si cerca una casella su cui
+     tutte le disposizioni sono d'accordo. Quella casella e' certa.
+     Se non resta nessuna disposizione possibile, vuol dire che in quella
+     riga c'e' un errore, e lo si segnala. */
+
+  var HINT_AFTER = 25000;     // fermo da tanti millisecondi -> arriva l'aiuto
+  var candCache = {};
+  var hintTimer = null;
+
+  function lineCandidates(clue, n) {
+    var key = n + '|' + clue.join(',');
+    if (candCache[key]) return candCache[key];
+
+    var blocks = clue.filter(function (c) { return c > 0; });
+    var out = [];
+
+    (function place(i, from, acc) {
+      if (i === blocks.length) {
+        var line = acc.slice();
+        while (line.length < n) line.push(0);
+        out.push(line);
+        return;
+      }
+      var need = 0;
+      for (var k = i; k < blocks.length; k++) need += blocks[k];
+      need += blocks.length - i - 1;
+
+      for (var start = from; start <= n - need; start++) {
+        var next = acc.slice();
+        while (next.length < start) next.push(0);
+        for (var b = 0; b < blocks[i]; b++) next.push(1);
+        if (i < blocks.length - 1) next.push(0);
+        place(i + 1, start + blocks[i] + 1, next);
+      }
+    })(0, 0, []);
+
+    candCache[key] = out;
+    return out;
+  }
+
+  function analyseLine(known, clue) {
+    var all = lineCandidates(clue, known.length);
+    var fit = [];
+    for (var c = 0; c < all.length; c++) {
+      var ok = true;
+      for (var i = 0; i < known.length; i++) {
+        if (known[i] !== -1 && known[i] !== all[c][i]) { ok = false; break; }
+      }
+      if (ok) fit.push(all[c]);
+    }
+    if (!fit.length) return { broken: true };
+
+    var forced = [];
+    for (var j = 0; j < known.length; j++) {
+      if (known[j] !== -1) continue;
+      var v = fit[0][j], same = true;
+      for (var f = 1; f < fit.length; f++) {
+        if (fit[f][j] !== v) { same = false; break; }
+      }
+      if (same) forced.push({ index: j, value: v });
+    }
+    return { forced: forced, options: fit.length };
+  }
+
+  function knownAt(x, y) {
+    var s = game.grid[y * game.level.size + x];
+    return s === FULL ? 1 : (s === MARK ? 0 : -1);
+  }
+
+  function findMistake() {
+    var n = game.level.size;
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        var st = game.grid[y * n + x];
+        var truth = solutionCell(game.level, x, y);
+        if (st === FULL && !truth) return { x: x, y: y };
+        if (st === MARK && truth) return { x: x, y: y };
+      }
+    }
+    return null;
+  }
+
+  function findHint() {
+    var n = game.level.size;
+    var best = null;
+
+    function consider(kind, idx, known, clue) {
+      var res = analyseLine(known, clue);
+      if (res.broken || !res.forced.length) return;
+      // si preferisce la riga con meno alternative: e' la piu' facile da vedere
+      if (!best || res.options < best.options) {
+        var f = res.forced[0];
+        best = {
+          kind: kind,
+          idx: idx,
+          options: res.options,
+          value: f.value,
+          x: kind === 'row' ? f.index : idx,
+          y: kind === 'row' ? idx : f.index
+        };
+      }
+    }
+
+    for (var y = 0; y < n; y++) {
+      var row = [];
+      for (var x = 0; x < n; x++) row.push(knownAt(x, y));
+      consider('row', y, row, game.level.rows[y]);
+    }
+    for (var x2 = 0; x2 < n; x2++) {
+      var col = [];
+      for (var y2 = 0; y2 < n; y2++) col.push(knownAt(x2, y2));
+      consider('col', x2, col, game.level.cols[x2]);
+    }
+    return best;
+  }
+
+  function hintText(h) {
+    var dove = (h.kind === 'row' ? 'Riga ' : 'Colonna ') + (h.idx + 1);
+    return h.value === 1
+      ? dove + ': questa casella deve essere piena, non c\u0027e\u0027 altro modo.'
+      : dove + ': questa casella resta per forza vuota.';
+  }
+
+  function showHint() {
+    if (!game || game.won || !game.level.hints) return;
+    clearHintMark();
+
+    // Prima cosa: c'e' gia' un quadretto sbagliato? Se si', segnalarlo subito
+    // e' piu' utile che dare un consiglio costruito su una premessa falsa.
+    var bad = findMistake();
+    if (bad) {
+      el('hint-text').textContent = 'Riga ' + (bad.y + 1) +
+        ': qui c\u0027e\u0027 un quadretto sbagliato. Meglio sistemarlo prima di andare avanti.';
+      for (var i = 0; i < game.level.size; i++) cellAt(i, bad.y).classList.add('is-suspect');
+      el('hint').hidden = false;
+      return;
+    }
+
+    var h = findHint();
+    if (!h) return;
+
+    el('hint-text').textContent = hintText(h);
+    cellAt(h.x, h.y).classList.add('is-hinted');
+    el('hint').hidden = false;
+  }
+
+  function clearHintMark() {
+    if (!game || !game.cells) return;
+    for (var i = 0; i < game.cells.length; i++) {
+      game.cells[i].classList.remove('is-hinted', 'is-suspect');
+    }
+  }
+
+  function hideHint() {
+    if (!game) return;
+    el('hint').hidden = true;
+    clearHintMark();
+  }
+
+  function armHint() {
+    clearTimeout(hintTimer);
+    if (!game || game.won || !game.level.hints) return;
+    hintTimer = setTimeout(showHint, HINT_AFTER);
+  }
+
+  function disarmHint() {
+    clearTimeout(hintTimer);
+    hintTimer = null;
   }
 
   /* ---------------- partita ---------------- */
@@ -371,6 +552,9 @@
     buildBoard();
     show('game');
     startClock();
+    el('hint').hidden = true;
+    el('hint-badge').hidden = !level.hints;
+    armHint();
   }
 
   function startClock() {
@@ -390,6 +574,8 @@
   function finish() {
     game.won = true;
     stopClock();
+    disarmHint();
+    hideHint();
     el('board').classList.add('is-locked');
 
     // le caselle segnate spariscono: resta solo il disegno
@@ -468,6 +654,7 @@
   function goHome() {
     saveRun();
     stopClock();
+    disarmHint();
     game = null;
     renderHome();
     show('home');
@@ -515,16 +702,91 @@
   });
 
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { saveRun(); stopClock(); }
-    else if (game && !game.won && !el('game').hidden) startClock();
+    if (document.hidden) { saveRun(); stopClock(); disarmHint(); }
+    else if (game && !game.won && !el('game').hidden) { startClock(); armHint(); }
   });
 
   window.addEventListener('pagehide', saveRun);
+
+  /* ---------------- aggiunta alla schermata Home ----------------
+     Due mondi diversi. Su Android e desktop Chromium il browser avvisa che
+     l'app e' installabile (evento beforeinstallprompt): mettiamo da parte
+     l'avviso e lo rigiochiamo quando l'utente tocca il pulsante, cosi'
+     l'installazione e' vera. Su iPhone quell'evento non esiste: Safari non
+     l'ha mai implementato e non c'e' nessuna API per aggiungere una
+     scorciatoia. Li' il pulsante puo' solo spiegare dove toccare. */
+
+  var deferredPrompt = null;
+
+  function isStandalone() {
+    var mm = window.matchMedia && window.matchMedia('(display-mode: standalone)');
+    return (mm && mm.matches) || window.navigator.standalone === true;
+  }
+
+  function isIOS() {
+    var ua = navigator.userAgent;
+    if (/iPad|iPhone|iPod/.test(ua)) return true;
+    // l'iPad recente si dichiara un Mac: lo si riconosce dal touch
+    return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  }
+
+  function isIOSSafari() {
+    // dentro Instagram, Facebook, Chrome o Firefox su iOS la voce
+    // "Aggiungi a Home" non c'e' proprio
+    return isIOS() && !/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
+  }
+
+  function refreshInstall() {
+    var box = el('install');
+    if (isStandalone()) { box.hidden = true; return; }
+
+    if (deferredPrompt) {
+      el('install-msg').textContent = 'Installalo: parte a schermo intero e funziona anche senza rete.';
+      el('btn-install').textContent = 'Installa il gioco';
+      box.hidden = false;
+    } else if (isIOS()) {
+      el('install-msg').textContent = 'Mettilo nella schermata Home: parte a schermo intero e funziona anche senza rete.';
+      el('btn-install').textContent = 'Aggiungi alla Home';
+      box.hidden = false;
+    } else {
+      box.hidden = true;
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    refreshInstall();
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferredPrompt = null;
+    el('install').hidden = true;
+  });
+
+  el('btn-install').addEventListener('click', function () {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function () {
+        deferredPrompt = null;
+        refreshInstall();
+      });
+      return;
+    }
+    el('ios-safari').hidden = isIOSSafari() ? false : true;
+    el('ios-other').hidden = isIOSSafari() ? true : false;
+    el('sheet').hidden = false;
+  });
+
+  el('btn-sheet-close').addEventListener('click', function () {
+    el('sheet').hidden = true;
+  });
 
   /* ---------------- avvio ---------------- */
 
   renderHome();
   show('home');
+  refreshInstall();
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
