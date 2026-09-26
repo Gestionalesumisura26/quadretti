@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Quadretti</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="Crucipixel: scopri il disegno nascosto ragionando sui numeri.">
+<meta name="theme-color" content="#16262C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Quadretti">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ============ ELENCO LIVELLI ============ -->
+<section id="home" class="screen">
+  <header class="masthead">
+    <h1 class="wordmark">Quadretti</h1>
+    <p class="tagline">I numeri dicono quanti quadretti colorare di fila.<br>Ragiona, e viene fuori un disegno.</p>
+    <p class="tally"><span id="tally-done">0</span> di <span id="tally-all">0</span> risolti</p>
+  </header>
+
+  <div class="gallery">
+    <h2 class="band">Piccoli <span>5 × 5</span></h2>
+    <div class="tiles" id="tiles-5"></div>
+    <h2 class="band">Grandi <span>10 × 10</span></h2>
+    <div class="tiles" id="tiles-10"></div>
+  </div>
+
+  <footer class="colophon">
+    <button class="link-btn" id="btn-wipe" type="button">Azzera i progressi</button>
+  </footer>
+</section>
+
+<!-- ============ PARTITA ============ -->
+<section id="game" class="screen" hidden>
+  <header class="topbar">
+    <button class="icon-btn" id="btn-back" type="button" aria-label="Torna all'elenco">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>
+    </button>
+    <div class="topbar-title">
+      <strong id="game-title">—</strong>
+      <span id="game-sub"></span>
+    </div>
+    <time id="clock" aria-label="Tempo trascorso">0:00</time>
+  </header>
+
+  <div class="board-wrap">
+    <div id="board" class="board"></div>
+  </div>
+
+  <div class="controls">
+    <div class="modes" role="group" aria-label="Cosa fa il tocco">
+      <button type="button" class="mode is-on" data-mode="fill" aria-pressed="true">
+        <span class="swatch swatch-fill"></span>Riempi
+      </button>
+      <button type="button" class="mode" data-mode="mark" aria-pressed="false">
+        <span class="swatch swatch-mark"></span>Segna vuoto
+      </button>
+    </div>
+    <button type="button" class="link-btn" id="btn-restart">Ricomincia il quadro</button>
+  </div>
+</section>
+
+<!-- ============ VITTORIA ============ -->
+<div id="win" class="curtain" hidden>
+  <div class="win-card">
+    <canvas id="win-art" width="240" height="240" aria-hidden="true"></canvas>
+    <h2 id="win-name">—</h2>
+    <p id="win-time">—</p>
+    <div class="win-actions">
+      <button type="button" class="btn btn-primary" id="btn-next">Quadro successivo</button>
+      <button type="button" class="link-btn" id="btn-gallery">Torna all'elenco</button>
+    </div>
+  </div>
+</div>
+
+<script src="levels.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

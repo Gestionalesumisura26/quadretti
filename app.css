@@ -1,0 +1,344 @@
+/* Quadretti — crucipixel
+   Tavolozza: petrolio profondo per la cornice, carta chiara per il quadro,
+   inchiostro scuro per i quadretti pieni, ottone solo per cio' che e' risolto. */
+
+:root {
+  --ground:      #16262C;
+  --ground-soft: #1E333B;
+  --rule:        #2C454E;
+
+  --paper:       #E7EAE3;
+  --cell:        #F7F8F4;
+  --line:        #C3CCC6;
+  --line-strong: #8B9C96;
+  --ink:         #16333B;
+  --mark:        #93A39D;
+
+  --text:        #DCE3DF;
+  --text-dim:    #89A09A;
+  --brass:       #DFA232;
+
+  --pad: clamp(16px, 5vw, 28px);
+  --radius: 10px;
+
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: inherit; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button { font: inherit; color: inherit; }
+
+.screen[hidden], .curtain[hidden] { display: none; }
+
+/* ---------- elenco livelli ---------- */
+
+#home { padding: 0 var(--pad) 48px; max-width: 620px; margin: 0 auto; }
+
+.masthead { padding: 40px 0 28px; }
+
+.wordmark {
+  margin: 0;
+  font-size: clamp(38px, 12vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: #fff;
+}
+
+.tagline {
+  margin: 14px 0 0;
+  max-width: 34ch;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+
+.tally {
+  margin: 20px 0 0;
+  font-size: 14px;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+.band {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 34px 0 14px;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.band span { color: var(--text-dim); font-weight: 400; font-size: 14px; }
+.band::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  appearance: none;
+  border: 1px solid var(--rule);
+  background: var(--ground-soft);
+  border-radius: var(--radius);
+  padding: 10px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.tile:active { background: #24404A; }
+.tile.is-done { border-color: rgba(223,162,50,.45); }
+.tile:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.tile canvas { display: block; width: 100%; height: auto; border-radius: 3px; }
+
+.tile-name {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.tile.is-done .tile-name { color: var(--brass); }
+
+.tile-time { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+.colophon { margin-top: 44px; text-align: center; }
+
+.link-btn {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 8px 4px;
+  color: var(--text-dim);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.link-btn:active { color: var(--text); }
+
+/* ---------- partita ---------- */
+
+#game {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px var(--pad);
+  border-bottom: 1px solid var(--rule);
+}
+
+.icon-btn {
+  appearance: none;
+  background: none;
+  border: 0;
+  width: 40px;
+  height: 40px;
+  margin-left: -10px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.icon-btn svg { width: 24px; height: 24px; fill: none; stroke: var(--text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.topbar-title { flex: 1; min-width: 0; line-height: 1.25; }
+.topbar-title strong { display: block; font-size: 16px; font-weight: 650; }
+.topbar-title span { font-size: 12.5px; color: var(--text-dim); }
+
+#clock {
+  font-size: 15px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.board-wrap {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 14px 8px;
+}
+
+.board {
+  display: grid;
+  gap: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* caselle degli indizi */
+.clue {
+  display: flex;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-size: calc(var(--cell) * 0.42);
+  line-height: 1;
+}
+.clue.row { align-items: center; justify-content: flex-end; padding-right: calc(var(--cell) * 0.18); gap: calc(var(--cell) * 0.24); }
+.clue.col { flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: calc(var(--cell) * 0.18); gap: calc(var(--cell) * 0.16); }
+.clue.is-done { color: var(--text-dim); opacity: .42; }
+
+.corner { background: transparent; }
+
+/* caselle giocabili */
+.sq {
+  background: var(--cell);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.sq[data-edge-top] { border-top: 1px solid var(--line-strong); }
+.sq[data-edge-left] { border-left: 1px solid var(--line-strong); }
+.sq[data-block-right] { border-right-color: var(--line-strong); }
+.sq[data-block-bottom] { border-bottom-color: var(--line-strong); }
+
+.sq[data-state="1"] { background: var(--ink); }
+
+.sq[data-state="2"]::before,
+.sq[data-state="2"]::after {
+  content: "";
+  position: absolute;
+  inset: 32% 50%;
+  width: 1.5px;
+  background: var(--mark);
+  left: 50%;
+  transform-origin: center;
+}
+.sq[data-state="2"]::before { transform: translateX(-50%) rotate(45deg); }
+.sq[data-state="2"]::after  { transform: translateX(-50%) rotate(-45deg); }
+
+.board.is-locked { pointer-events: none; }
+
+/* ---------- comandi ---------- */
+
+.controls {
+  padding: 4px var(--pad) 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.modes {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  background: var(--ground-soft);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.mode {
+  appearance: none;
+  flex: 1;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  padding: 11px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.mode.is-on { background: var(--rule); color: var(--text); font-weight: 600; }
+.mode:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.swatch { width: 14px; height: 14px; border-radius: 3px; position: relative; flex: none; }
+.swatch-fill { background: var(--paper); }
+.swatch-mark { border: 1px solid var(--text-dim); }
+.swatch-mark::before, .swatch-mark::after {
+  content: ""; position: absolute; inset: 2px 50%; width: 1.5px; left: 50%; background: currentColor;
+}
+.swatch-mark::before { transform: translateX(-50%) rotate(45deg); }
+.swatch-mark::after { transform: translateX(-50%) rotate(-45deg); }
+
+/* ---------- vittoria ---------- */
+
+.curtain {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 24, .88);
+  display: grid;
+  place-items: center;
+  padding: var(--pad);
+  z-index: 10;
+}
+
+.win-card {
+  background: var(--ground-soft);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 26px 24px 20px;
+  text-align: center;
+  max-width: 330px;
+  width: 100%;
+  animation: rise .28s ease-out;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { .win-card { animation: none; } }
+
+#win-art {
+  width: 180px;
+  height: 180px;
+  background: var(--paper);
+  border-radius: 6px;
+}
+
+.win-card h2 {
+  margin: 18px 0 2px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--brass);
+}
+#win-time { margin: 0; color: var(--text-dim); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+.win-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 4px; }
+
+.btn {
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary { background: var(--brass); color: #1B1405; }
+.btn-primary:active { background: #C78E24; }
+.btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
