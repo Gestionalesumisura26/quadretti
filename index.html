@@ -22,7 +22,7 @@
   <header class="masthead">
     <h1 class="wordmark">Quadretti</h1>
     <p class="tagline">I numeri dicono quanti quadretti colorare di fila.<br>Ragiona, e viene fuori un disegno.</p>
-    <p class="tally"><span id="tally-done">0</span> di <span id="tally-all">0</span> risolti</p>
+    <p class="tally"><span id="tally-done">0</span> di <span id="tally-all">0</span> risolti<span class="badge" id="tally-streak" hidden></span></p>
   </header>
 
   <section class="primer">
@@ -66,6 +66,7 @@
   </div>
 
   <footer class="colophon">
+    <button class="link-btn" id="btn-stats" type="button">Statistiche</button>
     <button class="link-btn" id="btn-wipe" type="button">Azzera i progressi</button>
   </footer>
 </section>
@@ -102,6 +103,39 @@
       </button>
     </div>
     <button type="button" class="link-btn" id="btn-restart">Ricomincia il quadro</button>
+  </div>
+</section>
+
+<!-- ============ STATISTICHE ============ -->
+<section id="stats" class="screen" hidden>
+  <header class="topbar">
+    <button class="icon-btn" id="btn-stats-back" type="button" aria-label="Torna all'elenco">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>
+    </button>
+    <div class="topbar-title"><strong>Statistiche</strong></div>
+  </header>
+
+  <div class="stats-body">
+    <div class="figures">
+      <div class="figure"><b id="st-solved">0</b><span>quadri risolti</span></div>
+      <div class="figure"><b id="st-streak">0</b><span>giorni di fila</span></div>
+      <div class="figure"><b id="st-time">0s</b><span>tempo passato</span></div>
+    </div>
+    <p class="figures-note" id="st-streak-note"></p>
+
+    <h3>Ultime due settimane</h3>
+    <div class="chart" id="st-chart"></div>
+    <p class="figures-note" id="st-days"></p>
+
+    <h3>Dove sei arrivato</h3>
+    <dl class="rows">
+      <dt>Galleria</dt><dd id="st-gallery">—</dd>
+      <dt>Allenamento</dt><dd id="st-train">—</dd>
+      <dt>Miglior tempo 5 × 5</dt><dd id="st-best5">—</dd>
+      <dt>Miglior tempo 10 × 10</dt><dd id="st-best10">—</dd>
+    </dl>
+
+    <p class="figures-note">Questi numeri stanno solo dentro il tuo telefono.</p>
   </div>
 </section>
 
