@@ -23,9 +23,11 @@
       s.runs = s.runs || {};
       s.done = s.done || {};
       s.train = s.train || { grade: 1, solved: 0 };
+      s.log = s.log || [];
+      s.stats = s.stats || { solved: 0, seconds: 0 };
       return s;
     } catch (e) {
-      return { runs: {}, done: {}, train: { grade: 1, solved: 0 } };
+      return { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 } };
     }
   }
 
@@ -165,7 +167,127 @@
 
     el('tally-done').textContent = done;
     el('tally-all').textContent = LEVELS.length;
+
+    var sk = streaks();
+    el('tally-streak').textContent = sk.now > 1 ? spell(sk.now, 'giorno', 'giorni') + ' di fila' : '';
+    el('tally-streak').hidden = sk.now < 2;
+
     renderTrain();
+  }
+
+  /* ---------------- statistiche ----------------
+     Tutto si ricava dal registro delle vittorie tenuto nel telefono.
+     Niente esce di qui: non c'e' nessun server. */
+
+  function dayNumber(key) {
+    var p = key.split('-');
+    return Math.floor(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000);
+  }
+
+  function streaks() {
+    var days = {};
+    for (var i = 0; i < store.log.length; i++) days[store.log[i].d] = true;
+
+    var list = Object.keys(days).map(dayNumber).sort(function (a, b) { return a - b; });
+    if (!list.length) return { now: 0, best: 0, days: 0 };
+
+    var best = 1, run = 1;
+    for (var j = 1; j < list.length; j++) {
+      run = (list[j] === list[j - 1] + 1) ? run + 1 : 1;
+      if (run > best) best = run;
+    }
+
+    // la serie corrente vale solo se arriva a oggi o a ieri
+    var today = dayNumber(dayKey(new Date()));
+    var last = list[list.length - 1];
+    var now = 0;
+    if (last === today || last === today - 1) {
+      now = 1;
+      for (var k = list.length - 1; k > 0; k--) {
+        if (list[k] === list[k - 1] + 1) now++; else break;
+      }
+    }
+    return { now: now, best: best, days: list.length };
+  }
+
+  function spell(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+  }
+
+  function longTime(sec) {
+    var h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    if (h) return h + 'h ' + m + 'm';
+    if (sec < 60) return sec + 's';
+    return m + ' min';
+  }
+
+  function renderStats() {
+    var st = store.stats, sk = streaks();
+
+    el('st-solved').textContent = st.solved || 0;
+    el('st-streak').textContent = sk.now;
+    el('st-time').textContent = longTime(st.seconds || 0);
+
+    el('st-streak-note').textContent = sk.best > 1
+      ? 'la piu\u0027 lunga e\u0027 stata di ' + spell(sk.best, 'giorno', 'giorni')
+      : 'gioca domani per allungarla';
+
+    el('st-days').textContent = sk.days === 0
+      ? 'Non hai ancora risolto nulla.'
+      : 'Hai giocato in ' + spell(sk.days, 'giornata', 'giornate') + '.';
+
+    // galleria
+    var owned = 0;
+    for (var i = 0; i < LEVELS.length; i++) {
+      if (typeof store.done[LEVELS[i].id] === 'number') owned++;
+    }
+    el('st-gallery').textContent = owned + ' di ' + LEVELS.length;
+    el('st-train').textContent = store.train.solved === 0
+      ? 'nessuno'
+      : spell(store.train.solved, 'quadro', 'quadri') + ', fino al grado ' + (st.topGrade || 1);
+
+    el('st-best5').textContent = st.best5 ? mmss(st.best5) : '\u2014';
+    el('st-best10').textContent = st.best10 ? mmss(st.best10) : '\u2014';
+
+    drawChart();
+  }
+
+  function drawChart() {
+    var box = el('st-chart');
+    box.innerHTML = '';
+
+    var count = {};
+    for (var i = 0; i < store.log.length; i++) {
+      count[store.log[i].d] = (count[store.log[i].d] || 0) + 1;
+    }
+
+    var top = 1;
+    var day = new Date();
+    var bars = [];
+    for (var back = 13; back >= 0; back--) {
+      var d = new Date(day.getTime() - back * 86400000);
+      var key = dayKey(d);
+      var n = count[key] || 0;
+      if (n > top) top = n;
+      bars.push({ n: n, d: d, key: key });
+    }
+
+    var names = ['D', 'L', 'M', 'M', 'G', 'V', 'S'];
+    for (var b = 0; b < bars.length; b++) {
+      var col = document.createElement('div');
+      col.className = 'bar' + (bars[b].n ? ' has' : '');
+      col.title = bars[b].n + ' il ' + bars[b].key;
+
+      var fill = document.createElement('i');
+      fill.style.height = Math.round((bars[b].n / top) * 100) + '%';
+      col.appendChild(fill);
+
+      var lab = document.createElement('span');
+      lab.textContent = names[bars[b].d.getDay()];
+      col.appendChild(lab);
+
+      box.appendChild(col);
+    }
   }
 
   /* ---------------- allenamento ----------------
@@ -624,6 +746,28 @@
     if (ticker) { clearInterval(ticker); ticker = null; }
   }
 
+  function dayKey(d) {
+    var m = d.getMonth() + 1, g = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (g < 10 ? '0' : '') + g;
+  }
+
+  function record() {
+    store.log.push({
+      d: dayKey(new Date()),
+      t: game.elapsed,
+      k: game.level.generated ? 't' : 'g',
+      s: game.level.size
+    });
+    // il registro non deve crescere all'infinito dentro il telefono
+    if (store.log.length > 400) store.log = store.log.slice(-400);
+
+    store.stats.solved++;
+    store.stats.seconds += game.elapsed;
+
+    var key = 'best' + game.level.size;
+    if (!store.stats[key] || game.elapsed < store.stats[key]) store.stats[key] = game.elapsed;
+  }
+
   function finish() {
     game.won = true;
     stopClock();
@@ -639,9 +783,14 @@
       }
     }
 
+    record();
+
     if (game.level.generated) {
       store.train.solved++;
       store.train.grade++;
+      if (!store.stats.topGrade || game.level.grade > store.stats.topGrade) {
+        store.stats.topGrade = game.level.grade;
+      }
       delete store.train.current;
       save();
     } else {
@@ -714,6 +863,7 @@
   function show(which) {
     el('home').hidden = which !== 'home';
     el('game').hidden = which !== 'game';
+    el('stats').hidden = which !== 'stats';
     el('win').hidden = true;
     window.scrollTo(0, 0);
   }
@@ -766,12 +916,21 @@
     else goHome();
   });
 
+  el('btn-stats').addEventListener('click', function () {
+    renderStats();
+    show('stats');
+  });
+  el('btn-stats-back').addEventListener('click', function () {
+    renderHome();
+    show('home');
+  });
+
   el('btn-train').addEventListener('click', newTraining);
   el('btn-train-resume').addEventListener('click', openTraining);
 
   el('btn-wipe').addEventListener('click', function () {
     if (!confirm('Cancelli tutti i progressi? Non si torna indietro.')) return;
-    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 } };
+    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 } };
     save();
     renderHome();
   });
