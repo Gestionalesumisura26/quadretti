@@ -511,3 +511,82 @@ button { font: inherit; color: inherit; }
 
 .train-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .train-actions .link-btn { padding: 8px 0; }
+
+/* ---------- statistiche ---------- */
+
+.colophon { display: flex; justify-content: center; gap: 22px; }
+
+.tally .badge { margin-left: 10px; }
+
+.stats-body { padding: 4px var(--pad) 48px; max-width: 620px; margin: 0 auto; }
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.figure {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  text-align: center;
+}
+.figure b {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+.figure span { font-size: 12px; color: var(--text-dim); }
+
+.figures-note { margin: 12px 0 0; font-size: 13.5px; color: var(--text-dim); }
+
+.stats-body h3 {
+  margin: 34px 0 14px;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 120px;
+}
+
+.bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.bar i {
+  display: block;
+  background: var(--rule);
+  border-radius: 3px 3px 0 0;
+  min-height: 3px;
+}
+.bar.has i { background: var(--brass); }
+.bar span { font-size: 10px; text-align: center; color: var(--text-dim); }
+
+.rows {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0;
+}
+.rows dt, .rows dd {
+  margin: 0;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 14.5px;
+}
+.rows dt { color: var(--text-dim); }
+.rows dd { text-align: right; font-variant-numeric: tabular-nums; }
