@@ -25,9 +25,10 @@
       s.train = s.train || { grade: 1, solved: 0 };
       s.log = s.log || [];
       s.stats = s.stats || { solved: 0, seconds: 0 };
+      if (typeof s.sound !== 'boolean') s.sound = true;
       return s;
     } catch (e) {
-      return { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 } };
+      return { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true };
     }
   }
 
@@ -472,6 +473,30 @@
     refreshClues();
   }
 
+  function voice(state) {
+    if (state === FULL) Sfx.fill();
+    else if (state === MARK) Sfx.mark();
+    else Sfx.erase();
+  }
+
+  /* Guida a croce: mentre tieni il dito premuto, riga e colonna sotto il
+     dito si schiariscono. Sul 10x10 perdere l'allineamento e' facilissimo
+     e si finisce per riempire la casella sbagliata. */
+  var lit = [];
+
+  function guide(x, y) {
+    for (var i = 0; i < lit.length; i++) lit[i].classList.remove('in-line');
+    lit = [];
+    if (x < 0 || !game || !game.cells) return;
+
+    var n = game.level.size;
+    for (var k = 0; k < n; k++) {
+      var a = cellAt(k, y), b = cellAt(x, k);
+      if (a) { a.classList.add('in-line'); lit.push(a); }
+      if (b) { b.classList.add('in-line'); lit.push(b); }
+    }
+  }
+
   function cellAt(x, y) {
     return game.cells[y * game.level.size + x];
   }
@@ -485,16 +510,38 @@
   }
 
   function refreshClues() {
-    var level = game.level, n = level.size;
+    var level = game.level, n = level.size, fresh = 0;
+
     for (var y = 0; y < n; y++) {
       var row = [];
       for (var x = 0; x < n; x++) row.push(game.grid[y * n + x]);
-      game.rowClueEls[y].classList.toggle('is-done', sameList(cluesOf(row), level.rows[y]));
+      var okRow = sameList(cluesOf(row), level.rows[y]);
+      if (okRow && !game.rowClueEls[y].classList.contains('is-done')) { fresh++; sweep('row', y); }
+      game.rowClueEls[y].classList.toggle('is-done', okRow);
     }
+
     for (var x2 = 0; x2 < n; x2++) {
       var col = [];
       for (var y2 = 0; y2 < n; y2++) col.push(game.grid[y2 * n + x2]);
-      game.colClueEls[x2].classList.toggle('is-done', sameList(cluesOf(col), level.cols[x2]));
+      var okCol = sameList(cluesOf(col), level.cols[x2]);
+      if (okCol && !game.colClueEls[x2].classList.contains('is-done')) { fresh++; sweep('col', x2); }
+      game.colClueEls[x2].classList.toggle('is-done', okCol);
+    }
+
+    if (fresh && !game.won) Sfx.line();
+  }
+
+  /* Una riga che torna si accende per un attimo: e' il momento in cui il
+     ragionamento ha funzionato, e vale la pena farlo sentire. */
+  function sweep(kind, idx) {
+    var n = game.level.size;
+    for (var i = 0; i < n; i++) {
+      var cell = kind === 'row' ? cellAt(i, idx) : cellAt(idx, i);
+      if (!cell) continue;
+      cell.style.setProperty('--step', i);
+      cell.classList.remove('lit');
+      void cell.offsetWidth;
+      cell.classList.add('lit');
     }
   }
 
@@ -532,6 +579,8 @@
 
     paint = { want: want, axis: null, x0: x, y0: y, cx: e.clientX, cy: e.clientY, moved: false, longTimer: null };
     setCell(x, y, want);
+    voice(want);
+    guide(x, y);
 
     // pressione prolungata: scorciatoia per segnare una casella come vuota
     if (game.mode === 'fill' && cur === EMPTY) {
@@ -539,6 +588,7 @@
         if (!paint || paint.moved) return;
         paint.want = MARK;
         setCell(paint.x0, paint.y0, MARK);
+        Sfx.mark();
         refreshClues();
         if (navigator.vibrate) navigator.vibrate(12);
       }, 420);
@@ -570,13 +620,15 @@
     if (paint.axis === 'v' && x !== paint.x0) return;
     if (!paint.axis) return;
 
-    setCell(x, y, paint.want);
+    guide(x, y);
+    if (setCell(x, y, paint.want)) voice(paint.want);
   }
 
   function onUp() {
     if (!paint) return;
     clearTimeout(paint.longTimer);
     paint = null;
+    guide(-1, -1);
     refreshClues();
     hideHint();
     if (isSolved()) finish();
@@ -665,6 +717,7 @@
         ': qui c\u0027e\u0027 un quadretto sbagliato. Meglio sistemarlo prima di andare avanti.';
       for (var i = 0; i < game.level.size; i++) cellAt(i, bad.y).classList.add('is-suspect');
       el('hint').hidden = false;
+      Sfx.warn();
       return;
     }
 
@@ -801,7 +854,9 @@
       save();
     }
 
-    if (navigator.vibrate) navigator.vibrate([18, 60, 18]);
+    Sfx.win();
+    if (navigator.vibrate) navigator.vibrate([18, 60, 18]);   // inerte su iPhone
+    reveal();
 
     el('win-name').textContent = game.level.name;
     el('win-time').textContent = 'Risolto in ' + mmss(game.elapsed);
@@ -819,6 +874,22 @@
     }
 
     setTimeout(function () { el('win').hidden = false; }, 520);
+  }
+
+  /* Rivelazione: il disegno finito si accende in diagonale, da un angolo
+     all'altro, prima che compaia il cartellino della vittoria. */
+  function reveal() {
+    var n = game.level.size;
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        if (game.grid[y * n + x] !== FULL) continue;
+        var cell = cellAt(x, y);
+        cell.style.setProperty('--step', x + y);
+        cell.classList.remove('lit');
+        void cell.offsetWidth;
+        cell.classList.add('lit');
+      }
+    }
   }
 
   function nextUnsolved(afterId) {
@@ -916,6 +987,21 @@
     else goHome();
   });
 
+  function applySound() {
+    Sfx.setEnabled(store.sound);
+    var b = el('btn-sound');
+    b.textContent = store.sound ? 'Suono acceso' : 'Suono spento';
+    b.setAttribute('aria-pressed', store.sound ? 'true' : 'false');
+    b.classList.toggle('is-off', !store.sound);
+  }
+
+  el('btn-sound').addEventListener('click', function () {
+    store.sound = !store.sound;
+    save();
+    applySound();
+    if (store.sound) Sfx.fill();
+  });
+
   el('btn-stats').addEventListener('click', function () {
     renderStats();
     show('stats');
@@ -930,8 +1016,9 @@
 
   el('btn-wipe').addEventListener('click', function () {
     if (!confirm('Cancelli tutti i progressi? Non si torna indietro.')) return;
-    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 } };
+    store = { runs: {}, done: {}, train: { grade: 1, solved: 0 }, log: [], stats: { solved: 0, seconds: 0 }, sound: true };
     save();
+    applySound();
     renderHome();
   });
 
@@ -1022,6 +1109,7 @@
 
   /* ---------------- avvio ---------------- */
 
+  applySound();
   renderHome();
   show('home');
   refreshInstall();
